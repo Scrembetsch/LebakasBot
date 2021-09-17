@@ -1,6 +1,10 @@
 ﻿using Discord;
+using Discord.Commands;
 using Discord.WebSocket;
+using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Configuration;
+using System.Threading;
 using System.Threading.Tasks;
 using Util;
 
@@ -11,42 +15,49 @@ namespace LebakasBot
         public static void Main(string[] args)
         => new LebakasBot().MainAsync().GetAwaiter().GetResult();
 
-        private DiscordSocketClient _Client;
-        private Task Log(LogMessage msg)
-        {
-            ConsoleWrapper.WriteLine(msg.ToString(), msg.Severity switch
-            {
-                LogSeverity.Debug => ConsoleColor.White,
-                LogSeverity.Verbose => ConsoleColor.Gray,
-                LogSeverity.Info => ConsoleColor.Green,
-                LogSeverity.Warning => ConsoleColor.Yellow,
-                LogSeverity.Error => ConsoleColor.Red,
-                LogSeverity.Critical => ConsoleColor.DarkRed,
-                _ => ConsoleColor.Cyan
-            });
-            return Task.CompletedTask;
-        }
-
         public async Task MainAsync()
         {
-            _Client = new DiscordSocketClient();
+            TokenManager tokenManager = new TokenManager();
+            DiscordSocketConfig config = new DiscordSocketConfig()
+            {
+                MessageCacheSize = int.Parse(ConfigurationManager.AppSettings["MessageCacheSize"]),
+                TotalShards = int.Parse(ConfigurationManager.AppSettings["TotalShards"]),
+#if DEBUG
+                LogLevel = LogSeverity.Info
+#else
+                LogLevel = LogSeverity.Error
+#endif
+            };
 
-            _Client.Log += Log;
+            using (ServiceProvider services = ConfigureServices(config))
+            {
+                DiscordShardedClient shardClient = services.GetRequiredService<DiscordShardedClient>();
 
-            //  You can assign your bot token to a string, and pass that in to connect.
-            //  This is, however, insecure, particularly if you plan to have your code hosted in a public repository.
-            var token = "token";
+                shardClient.ShardReady += ReadyAsync;
+                shardClient.Log += Logger.LogAsync;
 
-            // Some alternative options would be to keep your token in an Environment Variable or a standalone file.
-            // var token = Environment.GetEnvironmentVariable("NameOfYourEnvironmentVariable");
-            // var token = File.ReadAllText("token.txt");
-            // var token = JsonConvert.DeserializeObject<AConfigurationClass>(File.ReadAllText("config.json")).Token;
+                await services.GetRequiredService<CommandHandlingService>().InitializeAsync();
 
-            await _Client.LoginAsync(TokenType.Bot, token);
-            await _Client.StartAsync();
+                await shardClient.LoginAsync(TokenType.Bot, tokenManager.Token);
+                await shardClient.StartAsync();
 
-            // Block this task until the program is closed.
-            await Task.Delay(-1);
+                await Task.Delay(Timeout.Infinite);
+            }
+        }
+
+        private ServiceProvider ConfigureServices(DiscordSocketConfig config)
+        {
+            return new ServiceCollection()
+                .AddSingleton(new DiscordShardedClient(config))
+                .AddSingleton<CommandService>()
+                .AddSingleton<CommandHandlingService>()
+                .BuildServiceProvider();
+        }
+
+        private Task ReadyAsync(DiscordSocketClient shard)
+        {
+            ConsoleWrapper.WriteLine($"Shard Number {shard.ShardId} is ready!");
+            return Task.CompletedTask;
         }
     }
 }
