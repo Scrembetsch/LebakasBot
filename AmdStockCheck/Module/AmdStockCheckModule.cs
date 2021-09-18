@@ -12,38 +12,58 @@ namespace AmdStockCheck.Module
     [Group("amd")]
     public class AmdStockCheckModule : ModuleBase<ShardedCommandContext>
     {
+        private string _Source = "AmdStockMdl";
         public AmdStockCheckService CheckService { get; set; }
 
         [Command]
         public async Task HelpCommand()
         {
-            await ReplyAsync("Usage: ");
+            await ReplyAsync("Usage:\nadd <ProductId>\nremove <ProductId>");
         }
 
         [Command("add")]
         public async Task AddCommand(string productId)
         {
-            AmdStockCheckService.RegisterReturnState ret = await CheckService.RegisterProductAsync(productId, Context.Guild.Id, Context.Channel.Id, Context.Message.Author.Id);
-            switch (ret)
-            {
-                case AmdStockCheckService.RegisterReturnState.UrlCheckFailed:
-                    await ReplyAsync("Failed to validate URL!");
-                    return;
+            _ = Task.Run(async () => {
+                AmdStockCheckService.RegisterReturnState ret = await CheckService.RegisterProductAsync(productId, Context.Message.Author.Id);
+                switch (ret)
+                {
+                    case AmdStockCheckService.RegisterReturnState.CannotMessage:
+                        await ReplyAsync("Cannot send you a private message! ADMIN PLZ FIX ┻━┻ ヘ╰( •̀ε•́ ╰)");
+                        return;
 
-                case AmdStockCheckService.RegisterReturnState.AlreadyRegistered:
-                    await ReplyAsync("Product already registered for this User in this Guild & Channel!");
-                    return;
+                    case AmdStockCheckService.RegisterReturnState.UrlCheckFailed:
+                        await ReplyAsync("Failed to validate URL! Product Id is probably wrong. 乁| ･ 〰 ･ |ㄏ");
+                        return;
 
-                case AmdStockCheckService.RegisterReturnState.Ok:
-                    await ReplyAsync("Added successfully!");
-                    return;
-            }
+                    case AmdStockCheckService.RegisterReturnState.AlreadyRegistered:
+                        await ReplyAsync("Product already registered for this User in this Guild & Channel! ། – _ – །");
+                        return;
+
+                    case AmdStockCheckService.RegisterReturnState.Ok:
+                        await ReplyAsync("Added successfully! ୧༼ ヘ ᗜ ヘ ༽୨");
+                        return;
+                }
+            });
         }
 
         [Command("remove")]
         public async Task RemoveCommand(string productId)
         {
+            _ = Task.Run(async () =>
+            {
+                AmdStockCheckService.UnregisterReturnState ret = CheckService.UnRegisterProduct(productId, Context.Message.Author.Id);
+                switch (ret)
+                {
+                    case AmdStockCheckService.UnregisterReturnState.NotRegistered:
+                        await ReplyAsync("You are not registered for this product! ୧( ಠ Д ಠ )୨");
+                        return;
 
+                    case AmdStockCheckService.UnregisterReturnState.Ok:
+                        await ReplyAsync("Removed you from mention list! ᕕ( ཀ ʖ̯ ཀ)ᕗ");
+                        return;
+                }
+            });
         }
     }
 }

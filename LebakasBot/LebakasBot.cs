@@ -1,18 +1,21 @@
-﻿using Discord;
+﻿using BackgroundMessageDispatcher;
+using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using Interfaces.Services;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Configuration;
+using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using Util;
 
 namespace LebakasBot
 {
     class LebakasBot
     {
-        public static void Main(string[] args)
+        public static void Main(string[] _)
         => new LebakasBot().MainAsync().GetAwaiter().GetResult();
 
         public async Task MainAsync()
@@ -47,16 +50,22 @@ namespace LebakasBot
 
         private ServiceProvider ConfigureServices(DiscordSocketConfig config)
         {
-            return new ServiceCollection()
+            ServiceProvider services = new ServiceCollection()
                 .AddSingleton(new DiscordShardedClient(config))
                 .AddSingleton<CommandService>()
                 .AddSingleton<CommandHandlingService>()
+                .AddSingleton<MessageDispatcher>()
+                .AddSingleton(AmdStockCheck.Util.Web.CreateClient())
+                .AddSingleton<AmdStockCheck.Service.AmdStockCheckService>()
                 .BuildServiceProvider();
+
+            services.GetServices<IService>().ToList().ForEach(x => x.ApplyConfig());
+            return services;
         }
 
         private Task ReadyAsync(DiscordSocketClient shard)
         {
-            ConsoleWrapper.WriteLine($"Shard Number {shard.ShardId} is ready!");
+            _ = Logger.LogAsync(new LogMessage(LogSeverity.Info, $"Shard {shard.ShardId}", $"Ready!"));
             return Task.CompletedTask;
         }
     }

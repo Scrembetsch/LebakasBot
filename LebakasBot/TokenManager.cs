@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Util;
+﻿using System.IO;
 
 namespace LebakasBot
 {
@@ -14,10 +8,7 @@ namespace LebakasBot
 
         public TokenManager(string path = "token.txt")
         {
-            using (StreamReader reader = new StreamReader(path))
-            {
-                Token = reader.ReadLine();
-            }
+            Token = File.ReadAllText(path);
         }
     }
 }

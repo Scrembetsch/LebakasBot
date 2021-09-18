@@ -1,29 +1,28 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace AmdStockCheck.Models
 {
-    public class RegisteredUser
+    [Table("Users")]
+    public sealed class RegisteredUser : IEquatable<RegisteredUser>, IEquatable<ulong>
     {
-        public ulong GuildId;
-        public ulong ChannelId;
-        public ulong UserId;
+        [Key]
+        public ulong UserId { get; set; }
 
         public bool Equals(RegisteredUser user)
         {
-            return GuildId == user.GuildId
-                && ChannelId == user.ChannelId
-                && UserId == user.UserId;
+            return UserId == user.UserId;
         }
 
-        public bool Equals(ulong guildId, ulong channelId, ulong userId)
+        public bool Equals(ulong userId)
         {
-            return GuildId == guildId
-                && ChannelId == channelId
-                && UserId == userId;
+            return UserId == userId;
         }
     }
 }

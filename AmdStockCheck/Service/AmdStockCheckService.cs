@@ -7,19 +7,25 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Util;
+using Discord.Commands;
+using GenericUtil.Extensions;
+using BackgroundMessageDispatcher;
+using System.Configuration;
+using Interfaces.Services;
 
 namespace AmdStockCheck.Service
 {
-    public class AmdStockCheckService
+    // Todo: Comments
+    // Todo: Logs
+    // Todo: Cleanup
+    public class AmdStockCheckService : IService
     {
-        HttpClient _Client = Web.CreateClient();
-
         public enum RegisterReturnState
         {
             Ok,
             AlreadyRegistered,
-            UrlCheckFailed
+            UrlCheckFailed,
+            CannotMessage
         }
 
         public enum UnregisterReturnState
@@ -28,100 +34,175 @@ namespace AmdStockCheck.Service
             NotRegistered
         }
 
-        private readonly List<string> _RegisteredProductIds = new List<string>();
-        private readonly Dictionary<string, string> _CheckUrls = new Dictionary<string, string>();
-        private readonly Dictionary<string, List<RegisteredUser>> _ProductUserMap = new Dictionary<string, List<RegisteredUser>>();
+        private float _CheckInterval;
+        private string _BaseCheckUrl;
+        private string _BaseOpenUrl;
+        private string _ErrorUrl;
+        private string _ContainString;
 
-        private readonly float _CheckInterval = 15.0f;
-        private readonly string _BaseCheckUrl = "https://www.amd.com/en/direct-buy/products/{ProductId}/at";
+        private Task _UrlCheckTask = null;
+        private CancellationTokenSource _UrlCheckCancelToken;
 
-        public AmdStockCheckService()
+        public readonly string _Source = "AmdStockSrvc";
+        private readonly Dictionary<string, ProductEntry> _RegisteredProducts = new Dictionary<string, ProductEntry>();
+
+
+        private Web.StockCheckClient _Client;
+        private MessageDispatcher _MessageDispatcher;
+        public AmdStockCheckService(IServiceProvider services)
         {
+            _Client = services.GetService<Web.StockCheckClient>();
+            _MessageDispatcher = services.GetService<MessageDispatcher>();
+
             // Load lists from config or db
+
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Initialized!"));
         }
 
-        public async Task<RegisterReturnState> RegisterProductAsync(string productId, ulong guildId, ulong channelId, ulong userId)
+        public void ApplyConfig()
         {
-            string checkUrl = _BaseCheckUrl.Replace("{productId}", productId);
-            if (!await ValidateUrlAsync(checkUrl))
+            _BaseCheckUrl = ConfigurationManager.AppSettings["AmdBaseCheckUrl"];
+            _BaseOpenUrl = ConfigurationManager.AppSettings["AmdBaseOpenUrl"];
+            _ErrorUrl = ConfigurationManager.AppSettings["AmdErrorUrl"];
+            _ContainString = ConfigurationManager.AppSettings["Add to cart"];
+            _CheckInterval = float.Parse(ConfigurationManager.AppSettings["AmdCheckInterval"]);
+
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Configured!"));
+        }
+
+        public async Task<RegisterReturnState> RegisterProductAsync(string productId, ulong userId)
+        {
+            await Task.Delay(5000);
+            bool messageSuccessful = await _MessageDispatcher.SendPrivateMessageAsync("Just checking if I can reach you ԅ( ͒ ۝ ͒ )ᕤ", userId);
+            if (!messageSuccessful)
+            {
+                return RegisterReturnState.CannotMessage;
+            }
+
+            string checkUrl = _BaseCheckUrl.Replace("{ProductId}", productId);
+            string alias = await ValidateUrlAsync(checkUrl);
+
+            if (string.IsNullOrWhiteSpace(alias))
             {
                 return RegisterReturnState.UrlCheckFailed;
             }
-            if(_RegisteredProductIds.FirstOrDefault(x => x == productId) == null)
+
+            if(!_RegisteredProducts.ContainsKey(productId))
             {
-                _RegisteredProductIds.Add(productId);
-                _ProductUserMap.Add(productId, new List<RegisteredUser>());
-                _CheckUrls.Add(productId,checkUrl);
-            }
-            if(_ProductUserMap[productId].FirstOrDefault(x => x.Equals(guildId, channelId, userId)) == null)
-            {
-                _ProductUserMap[productId].Add(new RegisteredUser()
+                _RegisteredProducts.Add(productId, new ProductEntry()
                 {
-                    GuildId = guildId,
-                    ChannelId = channelId,
+                    ProductId = productId,
+                    Alias = alias,
+                    CheckUrl = checkUrl,
+                    Users = new List<RegisteredUser>()
+                });
+            }
+
+            if(_RegisteredProducts[productId].Users.FirstOrDefault(x => x.Equals(userId)) == null)
+            {
+                _RegisteredProducts[productId].Users.Add(new RegisteredUser()
+                {
                     UserId = userId
                 });
-                return RegisterReturnState.Ok;
             }
             else
             {
                 return RegisterReturnState.AlreadyRegistered;
             }
+
+            if(_UrlCheckTask == null)
+            {
+                _UrlCheckCancelToken = new CancellationTokenSource();
+                _UrlCheckTask = Run(_UrlCheckCancelToken.Token);
+            }
+            return RegisterReturnState.Ok;
         }
 
-        public UnregisterReturnState UnRegisterProduct(string productId, ulong guildId, ulong channelId, ulong userId)
+        public UnregisterReturnState UnRegisterProduct(string productId, ulong userId)
         {
-            int index = _RegisteredProductIds.FindIndex(x => x == productId);
-            if(index == -1)
+            if(!_RegisteredProducts.ContainsKey(productId))
             {
                 return UnregisterReturnState.NotRegistered;
             }
-            int userIndex = _ProductUserMap[productId].FindIndex(x => x.Equals(guildId, channelId, userId));
+
+            int userIndex = _RegisteredProducts[productId].Users.FindIndex(x => x.Equals(userId));
             if(userIndex == -1)
             {
                 return UnregisterReturnState.NotRegistered;
             }
-            _ProductUserMap[productId].RemoveAt(userIndex);
-            if(_ProductUserMap[productId].Count == 0)
+
+            _RegisteredProducts[productId].Users.RemoveAt(userIndex);
+            if(_RegisteredProducts[productId].Users.Count == 0)
             {
-                _ProductUserMap.Remove(productId);
-                _CheckUrls.Remove(productId);
-                _RegisteredProductIds.RemoveAt(index);
+                _RegisteredProducts.Remove(productId);
             }
+
+            if(_RegisteredProducts.Count == 0)
+            {
+                _UrlCheckCancelToken.Cancel();
+            }
+
             return UnregisterReturnState.Ok;
         }
 
-        public void Run()
+        public async Task Run(CancellationToken token)
         {
-            while (true)
+            // just here to get this method running on background task
+            await Task.Delay(100, token);
+
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Background Task started!"));
+
+            while (!token.IsCancellationRequested)
             {
-                DateTime begin = DateTime.Now;
-                ConsoleWrapper.WriteLine(begin, ConsoleColor.Blue);
-                // Send all requests to get product info
-                var responseTasks = SendAllRequests(_Client);
+                try
+                {
+                    DateTime begin = DateTime.Now;
+                    // Send all requests to get product info
+                    var responseTasks = SendAllRequests(_Client);
 
-                CheckAllRequests(responseTasks);
+                    CheckAllRequests(responseTasks);
 
-                DateTime end = DateTime.Now;
-                float msSinceStart = (float)(end - begin).TotalMilliseconds;
-                int waitTime = (int)(_CheckInterval * 1000.0f - msSinceStart);
-                waitTime = Math.Max(0, waitTime);
-                Thread.Sleep(waitTime);
+                    DateTime end = DateTime.Now;
+                    float msSinceStart = (float)(end - begin).TotalMilliseconds;
+                    int waitTime = (int)(_CheckInterval * 1000.0f - msSinceStart);
+                    waitTime = Math.Max(0, waitTime);
+                    Thread.Sleep(waitTime);
+                }
+                catch(Exception e)
+                {
+                    _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Error, _Source, $"Error while running background task: {e}"));
+                    OnError();
+                }
+
             }
+
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Background Task stopped!"));
         }
 
-        private async Task<bool> ValidateUrlAsync(string url)
+        private async Task<string> ValidateUrlAsync(string url)
         {
+            // log and send that something is happening
             HttpResponseMessage message = await _Client.GetAsync(url);
-            return message.IsSuccessStatusCode;
+            if (message.IsSuccessStatusCode)
+            {
+                string content = await message.Content.ReadAsStringAsync();
+                string beginString = "<h2>";
+                int begin = content.IndexOf(beginString) + beginString.Length;
+                int end = content.IndexOf("</h2>", begin);
+                return content[begin..end];
+            }
+            else
+            {
+                return null;
+            }
         }
 
         private List<Task<HttpResponseMessage>> SendAllRequests(HttpClient client)
         {
             List<Task<HttpResponseMessage>> responses = new List<Task<HttpResponseMessage>>();
-            foreach (var urlPair in _CheckUrls)
+            foreach (var products in _RegisteredProducts)
             {
-                responses.Add(client.GetAsync(urlPair.Value));
+                responses.Add(client.GetAsync(products.Value.CheckUrl));
             }
             return responses;
         }
@@ -135,7 +216,7 @@ namespace AmdStockCheck.Service
                 {
                     if (responseTasks[i].IsCompleted)
                     {
-                        CheckResponse(responseTasks[i].Result);
+                        _ = CheckResponse(responseTasks[i].Result);
                         responseTasks.RemoveAt(i--);
                     }
                 }
@@ -144,53 +225,73 @@ namespace AmdStockCheck.Service
             }
         }
 
-        private void CheckResponse(HttpResponseMessage response)
+        private async Task CheckResponse(HttpResponseMessage response)
         {
-            int index = FindUrl(response.RequestMessage.RequestUri.ToString());
+            var product = _RegisteredProducts.FirstOrDefault(x => x.Value.CheckUrl == response.RequestMessage.RequestUri.ToString());
             if (response.IsSuccessStatusCode)
             {
-                if (Check(response))
+                if (await CheckAsync(response))
                 {
-                    ConsoleWrapper.WriteLine($"{_Alias[index]}: SUCCESS", SuccessColor);
-                    OnSuccess(index);
+                    OnSuccess(product.Value);
                 }
                 else
                 {
-                    ConsoleWrapper.WriteLine($"{_Alias[index]}: Not available", InfoColor);
-                    PlaySound(IStockChecker.CheckState.NotAvailable);
+                    _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Debug, _Source, $"{product.Value.Alias}: Not Available!"));
                 }
             }
             else
             {
-                ConsoleWrapper.WriteLine($"{_Alias[index]}: ERROR", ErrorColor);
-                PlaySound(IStockChecker.CheckState.RequestError);
+                // Error usually occurs when page enters queue mode -> Products will become available in a few minutes
+                OnError(product.Value);
             }
         }
 
-        private void OnSuccess(int index)
+        public async Task<bool> CheckAsync(HttpResponseMessage response)
         {
-            if ((DateTime.Now - _LastOpened[index]).TotalSeconds > _SiteOpenThreshold)
+            return (await response.Content.ReadAsStringAsync()).Contains(_ContainString);
+        }
+
+        private void OnSuccess(ProductEntry product)
+        {
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Success!"));
+
+            string openUrl = _BaseOpenUrl.Replace("{ProductId}", product.ProductId);
+            string message = $"Available: {product.Alias}\n{openUrl}";
+            foreach (var user in product.Users)
             {
-                Web.OpenUrl(_OpenUrls[index]);
-                PlaySound(IStockChecker.CheckState.InStock);
-                _LastOpened[index] = DateTime.Now;
+                _ = _MessageDispatcher.SendPrivateMessageAsync(message, user.UserId);
             }
-            else
+
+        }
+
+        private void OnError(ProductEntry product)
+        {
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Page error!"));
+
+            string message = $"Something's Not Quite Right...\n{_ErrorUrl}";
+            foreach (var user in product.Users)
             {
-                ConsoleWrapper.WriteLine("Opening site skipped, due to cooldown", NoticeColor);
+                _ = _MessageDispatcher.SendPrivateMessageAsync(message, user.UserId);
             }
         }
 
-        private int FindUrl(string url)
+        private void OnError()
         {
-            for (int i = 0; i < _CheckUrls.Count; i++)
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"Runner errror!"));
+
+            string message = $"Something's Not Quite Right...\n{_ErrorUrl}";
+            HashSet<ulong> allUniqueUsers = new HashSet<ulong>();
+            foreach(var item in _RegisteredProducts)
             {
-                if (_CheckUrls[i] == url)
+                foreach(var user in item.Value.Users)
                 {
-                    return i;
+                    allUniqueUsers.Add(user.UserId);
                 }
             }
-            return -1;
+            foreach(var userId in allUniqueUsers)
+            {
+                _ = _MessageDispatcher.SendPrivateMessageAsync(message, userId);
+            }
         }
     }
 }

@@ -9,30 +9,34 @@ namespace AmdStockCheck.Util
 {
     public static class Web
     {
-        public static HttpClient CreateClient()
+        public class StockCheckClient : HttpClient
+        {
+            public StockCheckClient() : base()
+            {
+            }
+
+            public StockCheckClient(HttpMessageHandler handler) : base(handler)
+            {
+            }
+
+            public StockCheckClient(HttpMessageHandler handler, bool disposeHandler) : base(handler, disposeHandler)
+            {
+            }
+        }
+
+        public static StockCheckClient CreateClient()
         {
             HttpClientHandler clientHandler = new HttpClientHandler()
             {
                 AutomaticDecompression = System.Net.DecompressionMethods.GZip
             };
-            HttpClient client = new HttpClient(clientHandler);
+            StockCheckClient client = new StockCheckClient(clientHandler);
 
             client.DefaultRequestHeaders.Add("Accept", "*/*");
             client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
             client.DefaultRequestHeaders.Add("Connection", "keep-alive");
 
             return client;
-        }
-
-        public static void OpenUrl(string url)
-        {
-            System.Diagnostics.Process.Start(
-                new System.Diagnostics.ProcessStartInfo()
-                {
-                    UseShellExecute = true,
-                    FileName = url
-                }
-            );
         }
     }
 }

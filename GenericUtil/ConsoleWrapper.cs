@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Util
+namespace GenericUtil
 {
     public static class ConsoleWrapper
     {
