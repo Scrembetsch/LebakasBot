@@ -59,7 +59,6 @@ namespace LebakasBot
                 .AddSingleton<AmdStockCheck.Service.AmdStockCheckService>()
                 .BuildServiceProvider();
 
-            services.GetServices<IService>().ToList().ForEach(x => x.ApplyConfig());
             return services;
         }
 

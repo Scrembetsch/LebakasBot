@@ -39,6 +39,7 @@ namespace AmdStockCheck.Service
         private string _BaseOpenUrl;
         private string _ErrorUrl;
         private string _ContainString;
+        private string _InQueueString;
 
         private Task _UrlCheckTask = null;
         private CancellationTokenSource _UrlCheckCancelToken;
@@ -57,6 +58,7 @@ namespace AmdStockCheck.Service
             // Load lists from config or db
 
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Initialized!"));
+            ApplyConfig();
         }
 
         public void ApplyConfig()
@@ -64,7 +66,8 @@ namespace AmdStockCheck.Service
             _BaseCheckUrl = ConfigurationManager.AppSettings["AmdBaseCheckUrl"];
             _BaseOpenUrl = ConfigurationManager.AppSettings["AmdBaseOpenUrl"];
             _ErrorUrl = ConfigurationManager.AppSettings["AmdErrorUrl"];
-            _ContainString = ConfigurationManager.AppSettings["Add to cart"];
+            _ContainString = ConfigurationManager.AppSettings["AmdCheckString"];
+            _InQueueString = ConfigurationManager.AppSettings["AmdInQueueCheckString"];
             _CheckInterval = float.Parse(ConfigurationManager.AppSettings["AmdCheckInterval"]);
 
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Configured!"));
@@ -72,7 +75,6 @@ namespace AmdStockCheck.Service
 
         public async Task<RegisterReturnState> RegisterProductAsync(string productId, ulong userId)
         {
-            await Task.Delay(5000);
             bool messageSuccessful = await _MessageDispatcher.SendPrivateMessageAsync("Just checking if I can reach you ԅ( ͒ ۝ ͒ )ᕤ", userId);
             if (!messageSuccessful)
             {
@@ -228,11 +230,15 @@ namespace AmdStockCheck.Service
         private async Task CheckResponse(HttpResponseMessage response)
         {
             var product = _RegisteredProducts.FirstOrDefault(x => x.Value.CheckUrl == response.RequestMessage.RequestUri.ToString());
-            if (response.IsSuccessStatusCode)
+            if (response.IsSuccessStatusCode && product.Value != null)
             {
-                if (await CheckAsync(response))
+                if (await CheckAvailableAsync(response))
                 {
                     OnSuccess(product.Value);
+                }
+                else if(await CheckInQueueAsync(response))
+                {
+                    OnInQueue(product.Value);
                 }
                 else
                 {
@@ -242,13 +248,18 @@ namespace AmdStockCheck.Service
             else
             {
                 // Error usually occurs when page enters queue mode -> Products will become available in a few minutes
-                OnError(product.Value);
+                OnError();
             }
         }
 
-        public async Task<bool> CheckAsync(HttpResponseMessage response)
+        public async Task<bool> CheckAvailableAsync(HttpResponseMessage response)
         {
             return (await response.Content.ReadAsStringAsync()).Contains(_ContainString);
+        }
+
+        public async Task<bool> CheckInQueueAsync(HttpResponseMessage response)
+        {
+            return (await response.Content.ReadAsStringAsync()).Contains(_InQueueString);
         }
 
         private void OnSuccess(ProductEntry product)
@@ -261,14 +272,14 @@ namespace AmdStockCheck.Service
             {
                 _ = _MessageDispatcher.SendPrivateMessageAsync(message, user.UserId);
             }
-
         }
 
-        private void OnError(ProductEntry product)
+        private void OnInQueue(ProductEntry product)
         {
-            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Page error!"));
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Success!"));
 
-            string message = $"Something's Not Quite Right...\n{_ErrorUrl}";
+            string openUrl = _BaseOpenUrl.Replace("{ProductId}", product.ProductId);
+            string message = $"Queue started: {product.Alias}\n{openUrl}";
             foreach (var user in product.Users)
             {
                 _ = _MessageDispatcher.SendPrivateMessageAsync(message, user.UserId);
@@ -277,7 +288,7 @@ namespace AmdStockCheck.Service
 
         private void OnError()
         {
-            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"Runner errror!"));
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"Runner error!"));
 
             string message = $"Something's Not Quite Right...\n{_ErrorUrl}";
             HashSet<ulong> allUniqueUsers = new HashSet<ulong>();
