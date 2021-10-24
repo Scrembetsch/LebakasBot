@@ -16,19 +16,14 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      # Checkout the repo
+      # Checkout the Repo
       - uses: actions/checkout@v2
 
-      # Setup .NET Core SDK
       - name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-          source-url: ${{ env.AZURE_ARTIFACTS_FEED_URL }}
-        env:
-          NUGET_AUTH_TOKEN: ${{ secrets.AZURE_ARTIFACTS_PAT }} 
+          dotnet-version: ${{ env.BUILD_FRAMEWORK }}
 
-      # Run dotnet build and package
       - name: DotNet Build
         run: |
           dotnet restore
@@ -39,14 +34,19 @@ jobs:
           touch LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
           echo "${{ secrets.BOT_TOKEN }}" >> LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
 
-      # # Create tar of build to copy to server
-      # - name: Archive Build
-      #   run: |
-      #     mkdir LebakasBot/publish
-      #     mkdir LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}
-      #     tar -C LebakasBot/bin/${{ env.BUILD_CONFIGURATION }} -czf LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz *
+      - name: Delete old Server files
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: | 
+            systemctl stop LebakasBot
+            rm -r lebakasbot/bin/
+            mkdir lebakasbot/bin
 
-      # Copy build artifacts via SCP to server
       - name: Deploy to Server
         uses: appleboy/scp-action@master
         with:
@@ -70,5 +70,3 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: | 
             systemctl restart LebakasBot
-
-          # tar -xvzf lebakasbot/lebakasbot.tar.gz
