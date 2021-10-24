@@ -31,7 +31,7 @@ jobs:
         run: |
           dotnet restore
           dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}' --framework '${{ env.BUILD_FRAMEWORK }}'
-          echo "${{ secrets.BOT_TOKEN }}" >> bin/${{ env.BUILD.CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
+          echo "${{ secrets.BOT_TOKEN }}" >> bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
 
       # Create tar of build to copy to server
       - name: Archive Build
