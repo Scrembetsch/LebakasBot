@@ -8,7 +8,7 @@ namespace LebakasBot
 
         public TokenManager(string path = "token.txt")
         {
-            string currentDir = System.Environment.CurrentDirectory;
+            string currentDir = System.Reflection.Assembly.GetExecutingAssembly().Location;
             if(!currentDir.EndsWith('/'))
             {
                 currentDir += '/';
