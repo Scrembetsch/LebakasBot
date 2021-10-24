@@ -59,7 +59,7 @@ jobs:
           target: "~/lebakasbot"
           strip_components: 3
       
-      Start Bot on Server via SSH
+      # Start Bot on Server via SSH
       - name: Start Bot on Server
         uses: appleboy/ssh-action@master
         with:
