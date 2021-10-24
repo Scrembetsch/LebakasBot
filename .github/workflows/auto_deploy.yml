@@ -56,7 +56,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: | 
-            kill $(ps aux | grep 'LebakasBot.dll' | awk '{print $2}')
+            ps -ef | grep LebakasBot.dll | grep -v grep | awk '{print $2}' | xargs kill
 
       # Copy build artifacts via SCP to server
       - name: Deploy to Server
