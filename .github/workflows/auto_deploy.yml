@@ -42,7 +42,8 @@ jobs:
       # Create tar of build to copy to server
       - name: Archive Build
         run: |
-          tar -czf publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz bin/${{ env.BUILD.CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}
+          mkdir LebakasBot/publish
+          tar -czf LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz bin/${{ env.BUILD.CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}
 
       # Kill old Bot via SSH
       - name: Start Bot on Server
