@@ -55,9 +55,9 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/*"
+          source: "LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/*"
           target: "~/lebakasbot/bin"
-          strip_components: 3
+          strip_components: 4
       
       # Start Bot on Server via SSH
       - name: Start Bot on Server
