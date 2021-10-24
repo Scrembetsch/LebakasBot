@@ -22,10 +22,11 @@ namespace AmdStockCheck.Module
         }
 
         [Command("add")]
-        public void AddCommand(string productId)
+        public Task AddCommand(string productId)
         {
-            _ = Logger.LogAsync(new LogMessage(LogSeverity.Info,_Source, $"{Context.Message.Author.Id} add {productId}"));
-            _ = Task.Run(async () => {
+            _ = Logger.LogAsync(new LogMessage(LogSeverity.Info, _Source, $"{Context.Message.Author.Id} add {productId}"));
+            _ = Task.Run(async () =>
+            {
                 AmdStockCheckService.RegisterReturnState ret = await CheckService.RegisterProductAsync(productId, Context.Message.Author.Id);
                 switch (ret)
                 {
@@ -38,7 +39,7 @@ namespace AmdStockCheck.Module
                         return;
 
                     case AmdStockCheckService.RegisterReturnState.AlreadyRegistered:
-                        await ReplyAsync("Product already registered for this User in this Guild & Channel! ། – _ – །");
+                        await ReplyAsync("Product already registered for this User! ། – _ – །");
                         return;
 
                     case AmdStockCheckService.RegisterReturnState.Ok:
@@ -46,10 +47,11 @@ namespace AmdStockCheck.Module
                         return;
                 }
             });
+            return Task.CompletedTask;
         }
 
         [Command("remove")]
-        public void RemoveCommand(string productId)
+        public Task RemoveCommand(string productId)
         {
             _ = Logger.LogAsync(new LogMessage(LogSeverity.Info, _Source, $"{Context.Message.Author.Id} remove {productId}"));
             _ = Task.Run(async () =>
@@ -66,6 +68,7 @@ namespace AmdStockCheck.Module
                         return;
                 }
             });
+            return Task.CompletedTask;
         }
     }
 }
