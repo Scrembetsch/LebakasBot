@@ -39,12 +39,12 @@ jobs:
           touch LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
           echo "${{ secrets.BOT_TOKEN }}" >> LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
 
-      # Create tar of build to copy to server
-      - name: Archive Build
-        run: |
-          mkdir LebakasBot/publish
-          mkdir LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}
-          tar -C LebakasBot/publish/${{ env.BUILD_CONFIGURATION }} -czf LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz *
+      # # Create tar of build to copy to server
+      # - name: Archive Build
+      #   run: |
+      #     mkdir LebakasBot/publish
+      #     mkdir LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}
+      #     tar -C LebakasBot/bin/${{ env.BUILD_CONFIGURATION }} -czf LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz *
 
       # Copy build artifacts via SCP to server
       - name: Deploy to Server
@@ -55,8 +55,8 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz"
-          target: "~/lebakasbot"
+          source: "LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/*"
+          target: "~/lebakasbot/bin"
           strip_components: 3
       
       # Start Bot on Server via SSH
@@ -69,4 +69,6 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: | 
-            tar -xvzf lebakasbot/lebakasbot.tar.gz
+            systemctl restart LebakasBot
+
+          # tar -xvzf lebakasbot/lebakasbot.tar.gz
