@@ -44,7 +44,7 @@ jobs:
         run: |
           mkdir LebakasBot/publish
           mkdir LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}
-          tar -czf LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}
+          tar -C LebakasBot/publish/${{ env.BUILD_CONFIGURATION }} -czf LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz *
 
       # Copy build artifacts via SCP to server
       - name: Deploy to Server
@@ -69,4 +69,4 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: | 
-            tar -xvzf lebakasbot/bin/lebakasbot.tar.gz
+            tar -xvzf lebakasbot/lebakasbot.tar.gz
