@@ -35,7 +35,19 @@ jobs:
         run: |
           dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}'
 
-      - name: Delete old Server files
+      - name: Copy new Build to Server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          source: "LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/*"
+          target: "~/lebakasbot/bin_new"
+          strip_components: 4
+      
+      - name: Stop current Bot, exchange Files and start new Bot
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -46,28 +58,6 @@ jobs:
           script: | 
             systemctl stop LebakasBot
             rm -r lebakasbot/bin/
-            mkdir lebakasbot/bin
-
-      - name: Deploy to Server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/*"
-          target: "~/lebakasbot/bin"
-          strip_components: 4
-      
-      # Start Bot on Server via SSH
-      - name: Start Bot on Server
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          script: | 
+            mv lebakasbot/bin_new/ lebakasbot/bin/
+            mkdir lebakasbot/bin_new
             systemctl restart LebakasBot
