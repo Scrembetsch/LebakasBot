@@ -29,10 +29,13 @@ jobs:
           NUGET_AUTH_TOKEN: ${{ secrets.AZURE_ARTIFACTS_PAT }} 
 
       # Run dotnet build and package
-      - name: DotNet Build and Restore Token
+      - name: DotNet Build
         run: |
           dotnet restore
           dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}' --framework '${{ env.BUILD_FRAMEWORK }}'
+
+      - name: Restore Token
+        run: |
           echo "${{ secrets.BOT_TOKEN }}" >> bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
 
       # Create tar of build to copy to server
