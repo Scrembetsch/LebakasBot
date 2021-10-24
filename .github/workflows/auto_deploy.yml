@@ -56,17 +56,17 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           source: "LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz"
-          target: "~/lebakasbot/bin"
+          target: "~/lebakasbot"
+          strip_components: 3
       
-      # Start Bot on Server via SSH
-      # - name: Start Bot on Server
-      #   uses: appleboy/ssh-action@master
-      #   with:
-      #     host: ${{ secrets.SSH_HOST }}
-      #     username: ${{ secrets.SSH_USER }}
-      #     port: ${{ secrets.SSH_PORT }}
-      #     key: ${{ secrets.SSH_KEY }}
-      #     passphrase: ${{ secrets.SSH_PASSPHRASE }}
-      #     script: | 
-      #       tar -xvzf lebakasbot/bin/lebakasbot.tar.gz
-      #       dotnet lebakasbot/bin/LebakasBot.dll
+      Start Bot on Server via SSH
+      - name: Start Bot on Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: | 
+            tar -xvzf lebakasbot/bin/lebakasbot.tar.gz
