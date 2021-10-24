@@ -8,7 +8,12 @@ namespace LebakasBot
 
         public TokenManager(string path = "token.txt")
         {
-            Token = File.ReadAllText(path);
+            string currentDir = System.Environment.CurrentDirectory;
+            if(!currentDir.EndsWith('/'))
+            {
+                currentDir += '/';
+            }
+            Token = File.ReadAllText(currentDir + path);
         }
     }
 }
