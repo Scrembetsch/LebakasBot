@@ -32,7 +32,7 @@ jobs:
       - name: DotNet Build
         run: |
           dotnet restore
-          dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}' --framework '${{ env.BUILD_FRAMEWORK }}'
+          dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}'
 
       - name: Restore Token
         run: |
