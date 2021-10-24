@@ -4,16 +4,24 @@ namespace LebakasBot
 {
     public class TokenManager
     {
+        private const string cTokenPathVar = "TOKEN_PATH";
         public string Token { get; }
 
         public TokenManager(string path = "token.txt")
         {
-            string currentDir = System.Reflection.Assembly.GetExecutingAssembly().Location;
-            if(!currentDir.EndsWith('/'))
+            string pathToToken = System.Environment.GetEnvironmentVariable(cTokenPathVar);
+            if (string.IsNullOrWhiteSpace(pathToToken))
             {
-                currentDir += '/';
+                pathToToken = "";
             }
-            Token = File.ReadAllText(currentDir + path);
+            else
+            {
+                if (!pathToToken.EndsWith('/'))
+                {
+                    pathToToken += '/';
+                }
+            }
+            Token = File.ReadAllText(pathToToken + path);
         }
     }
 }
