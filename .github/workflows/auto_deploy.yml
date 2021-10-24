@@ -36,6 +36,7 @@ jobs:
 
       - name: Restore Token
         run: |
+          touch bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
           echo "${{ secrets.BOT_TOKEN }}" >> bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
 
       # Create tar of build to copy to server
