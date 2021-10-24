@@ -25,15 +25,15 @@ jobs:
         with:
           dotnet-version: ${{ env.BUILD_VERSION }}
 
-      - name: DotNet Build
+      - name: Restore .NET and Token
         run: |
           dotnet restore
-          dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}'
-
-      - name: Restore Token
+          touch LebakasBot/token.txt
+          echo "${{ secrets.BOT_TOKEN }}" >> LebakasBot/token.txt
+    
+      - name: Build .NET
         run: |
-          touch LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
-          echo "${{ secrets.BOT_TOKEN }}" >> LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
+          dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}'
 
       - name: Delete old Server files
         uses: appleboy/ssh-action@master
