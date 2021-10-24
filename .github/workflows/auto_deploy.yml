@@ -54,7 +54,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SS_PASSPHRASE }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: | 
             kill $(ps aux | grep 'LebakasBot.dll' | awk '{print $2}')
 
@@ -66,7 +66,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SS_PASSPHRASE }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           source: publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz
           target: lebakasbot/bin
       
@@ -78,7 +78,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SS_PASSPHRASE }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: | 
             tar -xvzf lebakasbot/bin/lebakasbot.tar.gz
             dotnet lebakasbot/bin/LebakasBot.dll
