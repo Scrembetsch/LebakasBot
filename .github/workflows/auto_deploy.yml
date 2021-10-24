@@ -10,6 +10,7 @@ on:
 
 env:
   BUILD_CONFIGURATION: 'Release'
+  BUILD_VERSION: '5.x'
   BUILD_FRAMEWORK: 'net5.0'
 
 jobs:
@@ -22,7 +23,7 @@ jobs:
       - name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: ${{ env.BUILD_FRAMEWORK }}
+          dotnet-version: ${{ env.BUILD_VERSION }}
 
       - name: DotNet Build
         run: |
