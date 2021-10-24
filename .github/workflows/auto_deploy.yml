@@ -55,7 +55,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "LebakastBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz"
+          source: "LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz"
           target: "~/lebakasbot/bin"
       
       # Start Bot on Server via SSH
