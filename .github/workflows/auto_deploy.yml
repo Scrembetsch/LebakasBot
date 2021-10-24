@@ -8,6 +8,7 @@ on:
 
 env:
   BUILD_CONFIGURATION: 'Release'
+  BUILD_FRAMEWORK: 'net5.0'
 
 jobs:
   build-and-deploy:
@@ -26,10 +27,28 @@ jobs:
           NUGET_AUTH_TOKEN: ${{ secrets.AZURE_ARTIFACTS_PAT }} 
 
       # Run dotnet build and package
-      - name: dotnet build and publish
+      - name: DotNet Build and Restore Token
         run: |
           dotnet restore
-          dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}'
+          dotnet build --configuration '${{ env.BUILD_CONFIGURATION }}' --framework '${{ env.BUILD_FRAMEWORK }}'
+          echo "${{ secrets.BOT_TOKEN }}" >> bin/${{ env.BUILD.CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}/token.txt
+
+      # Create tar of build to copy to server
+      - name: Archive Build
+        run: |
+          tar -czf publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz bin/${{ env.BUILD.CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}
+
+      # Kill old Bot via SSH
+      - name: Start Bot on Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.SS_PASSPHRASE }}
+          script: | 
+            kill $(ps aux | grep 'LebakasBot.dll' | awk '{print $2}')
 
       # Copy build artifacts via SCP to server
       - name: Deploy to Server
@@ -40,8 +59,8 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SS_PASSPHRASE }}
-          source: bin/Release/net5.0/*
-          target: lebakasbot/Release/bin
+          source: publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz
+          target: lebakasbot/bin
       
       # Start Bot on Server via SSH
       - name: Start Bot on Server
@@ -53,4 +72,5 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SS_PASSPHRASE }}
           script: | 
-            dotnet lebakasbot/Release/bin/LebakasBot.dll
+            tar -xvzf lebakasbot/bin/lebakasbot.tar.gz
+            dotnet lebakasbot/bin/LebakasBot.dll
