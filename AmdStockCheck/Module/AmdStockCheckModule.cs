@@ -22,8 +22,9 @@ namespace AmdStockCheck.Module
         }
 
         [Command("add")]
-        public async Task AddCommand(string productId)
+        public void AddCommand(string productId)
         {
+            _ = Logger.LogAsync(new LogMessage(LogSeverity.Info,_Source, $"{Context.Message.Author.Id} add {productId}"));
             _ = Task.Run(async () => {
                 AmdStockCheckService.RegisterReturnState ret = await CheckService.RegisterProductAsync(productId, Context.Message.Author.Id);
                 switch (ret)
@@ -48,8 +49,9 @@ namespace AmdStockCheck.Module
         }
 
         [Command("remove")]
-        public async Task RemoveCommand(string productId)
+        public void RemoveCommand(string productId)
         {
+            _ = Logger.LogAsync(new LogMessage(LogSeverity.Info, _Source, $"{Context.Message.Author.Id} remove {productId}"));
             _ = Task.Run(async () =>
             {
                 AmdStockCheckService.UnregisterReturnState ret = CheckService.UnRegisterProduct(productId, Context.Message.Author.Id);
