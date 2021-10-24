@@ -43,7 +43,7 @@ jobs:
       - name: Archive Build
         run: |
           mkdir LebakasBot/publish
-          tar -czf LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}
+          tar -czf LebakasBot/publish/${{ env.BUILD_CONFIGURATION }}/lebakasbot.tar.gz LebakasBot/bin/${{ env.BUILD_CONFIGURATION }}/${{ env.BUILD_FRAMEWORK }}
 
       # Kill old Bot via SSH
       - name: Kill Bot on Server
