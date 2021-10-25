@@ -140,7 +140,7 @@ namespace AmdStockCheck.Service
             return RegisterReturnState.InternalError;
         }
 
-        public async Task<UnregisterReturnState> UnRegisterProduct(string productId, ulong userId)
+        public UnregisterReturnState UnRegisterProduct(string productId, ulong userId)
         {
             try
             {
@@ -302,7 +302,8 @@ namespace AmdStockCheck.Service
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Success!"));
 
             string openUrl = _BaseOpenUrl.Replace("{ProductId}", product.ProductId);
-            string message = $"Available: {product.Alias}\n{openUrl}";
+            string message = Data.PredefinedStrings.cService_Available.ReplaceId(0, product.Alias).ReplaceId(1, openUrl);
+
             foreach (var user in product.Users)
             {
                 _ = _MessageDispatcher.SendPrivateMessageAsync(message, user.UserId);
@@ -314,7 +315,8 @@ namespace AmdStockCheck.Service
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Success!"));
 
             string openUrl = _BaseOpenUrl.Replace("{ProductId}", product.ProductId);
-            string message = $"Queue started: {product.Alias}\n{openUrl}";
+            string message = Data.PredefinedStrings.cService_QueueStarted.ReplaceId(0, product.Alias).ReplaceId(1, openUrl);
+
             foreach (var user in product.Users)
             {
                 _ = _MessageDispatcher.SendPrivateMessageAsync(message, user.UserId);
@@ -325,7 +327,8 @@ namespace AmdStockCheck.Service
         {
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"Runner error!"));
 
-            string message = $"Something's Not Quite Right...\n{_ErrorUrl}";
+            string message = Data.PredefinedStrings.cService_RequestError.ReplaceId(0,_ErrorUrl);
+
             HashSet<ulong> allUniqueUsers = new HashSet<ulong>();
             List<Product> products = _AmdDbService.GetAllRegisteredProducts();
             foreach(var item in products)

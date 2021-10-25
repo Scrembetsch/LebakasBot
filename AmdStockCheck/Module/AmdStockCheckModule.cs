@@ -31,23 +31,23 @@ namespace AmdStockCheck.Module
                 switch (ret)
                 {
                     case AmdStockCheckService.RegisterReturnState.CannotMessage:
-                        await ReplyAsync("Cannot send you a private message! ADMIN PLZ FIX ┻━┻ ヘ╰( •̀ε•́ ╰)");
+                        await ReplyAsync(Data.PredefinedStrings.cAdd_CannotMessage);
                         break;
 
                     case AmdStockCheckService.RegisterReturnState.UrlCheckFailed:
-                        await ReplyAsync("Failed to validate URL! Product Id is probably wrong. 乁| ･ 〰 ･ |ㄏ");
+                        await ReplyAsync(Data.PredefinedStrings.cAdd_UrlCheckFailed);
                         break;
 
                     case AmdStockCheckService.RegisterReturnState.AlreadyRegistered:
-                        await ReplyAsync("Product already registered for this User! ། – _ – །");
+                        await ReplyAsync(Data.PredefinedStrings.cAdd_AlreadyRegisterd);
                         break;
 
                     case AmdStockCheckService.RegisterReturnState.Ok:
-                        await ReplyAsync("Added successfully! ୧༼ ヘ ᗜ ヘ ༽୨");
+                        await ReplyAsync(Data.PredefinedStrings.cAdd_Ok);
                         break;
 
                     case AmdStockCheckService.RegisterReturnState.InternalError:
-                        await ReplyAsync("Internal Error! (ʘᗩʘ’)");
+                        await ReplyAsync(Data.PredefinedStrings.cGeneral_InternalError);
                         break;
                 }
             });
@@ -60,19 +60,19 @@ namespace AmdStockCheck.Module
             _ = Logger.LogAsync(new LogMessage(LogSeverity.Info, _Source, $"{Context.Message.Author.Id} remove {productId}"));
             _ = Task.Run(async () =>
             {
-                AmdStockCheckService.UnregisterReturnState ret = await CheckService.UnRegisterProduct(productId, Context.Message.Author.Id);
+                AmdStockCheckService.UnregisterReturnState ret = CheckService.UnRegisterProduct(productId, Context.Message.Author.Id);
                 switch (ret)
                 {
                     case AmdStockCheckService.UnregisterReturnState.NotRegistered:
-                        await ReplyAsync("You are not registered for this product! ୧( ಠ Д ಠ )୨");
+                        await ReplyAsync(Data.PredefinedStrings.cRemove_NotRegistered);
                         break;
 
                     case AmdStockCheckService.UnregisterReturnState.Ok:
-                        await ReplyAsync("Removed you from mention list! ᕕ( ཀ ʖ̯ ཀ)ᕗ");
+                        await ReplyAsync(Data.PredefinedStrings.cRemove_Ok);
                         break;
 
                     case AmdStockCheckService.UnregisterReturnState.InternalError:
-                        await ReplyAsync("Internal Error! (ʘᗩʘ’)");
+                        await ReplyAsync(Data.PredefinedStrings.cGeneral_InternalError);
                         break;
                 }
             });
