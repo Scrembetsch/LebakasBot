@@ -11,27 +11,26 @@ using Discord.Commands;
 using GenericUtil.Extensions;
 using BackgroundMessageDispatcher;
 using System.Configuration;
-using Interfaces.Services;
+using AmdStockCheck.DataAccess;
 
 namespace AmdStockCheck.Service
 {
-    // Todo: Comments
-    // Todo: Logs
-    // Todo: Cleanup
-    public class AmdStockCheckService : IService
+    public class AmdStockCheckService
     {
         public enum RegisterReturnState
         {
             Ok,
             AlreadyRegistered,
             UrlCheckFailed,
-            CannotMessage
+            CannotMessage,
+            InternalError
         }
 
         public enum UnregisterReturnState
         {
             Ok,
-            NotRegistered
+            NotRegistered,
+            InternalError
         }
 
         private float _CheckInterval;
@@ -45,23 +44,29 @@ namespace AmdStockCheck.Service
         private CancellationTokenSource _UrlCheckCancelToken;
 
         public readonly string _Source = "AmdStockSrvc";
-        private readonly Dictionary<string, ProductEntry> _RegisteredProducts = new Dictionary<string, ProductEntry>();
 
+        private readonly Web.StockCheckClient _Client;
+        private readonly MessageDispatcher _MessageDispatcher;
+        private readonly AmdDatabaseService _AmdDbService;
 
-        private Web.StockCheckClient _Client;
-        private MessageDispatcher _MessageDispatcher;
         public AmdStockCheckService(IServiceProvider services)
         {
             _Client = services.GetService<Web.StockCheckClient>();
             _MessageDispatcher = services.GetService<MessageDispatcher>();
+            _AmdDbService = services.GetService<AmdDatabaseService>();
 
-            // Load lists from config or db
+            ApplyConfig();
+
+            if(_AmdDbService.GetAllRegisteredProducts().Count > 0)
+            {
+                _UrlCheckCancelToken = new CancellationTokenSource();
+                _UrlCheckTask = Run(_UrlCheckCancelToken.Token);
+            }
 
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Initialized!"));
-            ApplyConfig();
         }
 
-        public void ApplyConfig()
+        private void ApplyConfig()
         {
             _BaseCheckUrl = ConfigurationManager.AppSettings["AmdBaseCheckUrl"];
             _BaseOpenUrl = ConfigurationManager.AppSettings["AmdBaseOpenUrl"];
@@ -69,82 +74,111 @@ namespace AmdStockCheck.Service
             _ContainString = ConfigurationManager.AppSettings["AmdCheckString"];
             _InQueueString = ConfigurationManager.AppSettings["AmdInQueueCheckString"];
             _CheckInterval = float.Parse(ConfigurationManager.AppSettings["AmdCheckInterval"]);
-
-            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Configured!"));
         }
 
         public async Task<RegisterReturnState> RegisterProductAsync(string productId, ulong userId)
         {
-            bool messageSuccessful = await _MessageDispatcher.SendPrivateMessageAsync("Just checking if I can reach you ԅ( ͒ ۝ ͒ )ᕤ", userId);
-            if (!messageSuccessful)
+            try
             {
-                return RegisterReturnState.CannotMessage;
-            }
-
-            string checkUrl = _BaseCheckUrl.Replace("{ProductId}", productId);
-            string alias = await ValidateUrlAsync(checkUrl);
-
-            if (string.IsNullOrWhiteSpace(alias))
-            {
-                return RegisterReturnState.UrlCheckFailed;
-            }
-
-            if(!_RegisteredProducts.ContainsKey(productId))
-            {
-                _RegisteredProducts.Add(productId, new ProductEntry()
+                bool messageSuccessful = await _MessageDispatcher.SendPrivateMessageAsync("Just checking if I can reach you ԅ( ͒ ۝ ͒ )ᕤ", userId);
+                if (!messageSuccessful)
                 {
-                    ProductId = productId,
-                    Alias = alias,
-                    CheckUrl = checkUrl,
-                    Users = new List<RegisteredUser>()
-                });
-            }
+                    return RegisterReturnState.CannotMessage;
+                }
 
-            if(_RegisteredProducts[productId].Users.FirstOrDefault(x => x.Equals(userId)) == null)
-            {
-                _RegisteredProducts[productId].Users.Add(new RegisteredUser()
+                string checkUrl = _BaseCheckUrl.Replace("{ProductId}", productId);
+                string alias = await ValidateUrlAsync(checkUrl);
+
+                if (string.IsNullOrWhiteSpace(alias))
                 {
-                    UserId = userId
-                });
-            }
-            else
-            {
-                return RegisterReturnState.AlreadyRegistered;
-            }
+                    return RegisterReturnState.UrlCheckFailed;
+                }
 
-            if(_UrlCheckTask == null)
-            {
-                _UrlCheckCancelToken = new CancellationTokenSource();
-                _UrlCheckTask = Run(_UrlCheckCancelToken.Token);
+                Product product = _AmdDbService.GetProductById(productId);
+                if (product == null)
+                {
+                    product = new Product()
+                    {
+                        ProductId = productId,
+                        Alias = alias,
+                        CheckUrl = checkUrl,
+                        Users = null
+                    };
+
+                    _AmdDbService.AddNewProduct(product);
+                }
+
+                // User can default to null, because of db service
+                if (product.Users == null
+                    || product.Users.FirstOrDefault(x => x.UserId == userId) == null)
+                {
+                    bool success = _AmdDbService.AddUserToProduct(product, new User()
+                    {
+                        UserId = userId
+                    });
+                    if (!success)
+                    {
+                        return RegisterReturnState.InternalError;
+                    }
+                }
+                else
+                {
+                    return RegisterReturnState.AlreadyRegistered;
+                }
+
+                if (_UrlCheckTask == null)
+                {
+                    _UrlCheckCancelToken = new CancellationTokenSource();
+                    _UrlCheckTask = Run(_UrlCheckCancelToken.Token);
+                }
+                return RegisterReturnState.Ok;
             }
-            return RegisterReturnState.Ok;
+            catch(Exception e)
+            {
+                _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Error, _Source, e.Message, e));
+            }
+            return RegisterReturnState.InternalError;
         }
 
-        public UnregisterReturnState UnRegisterProduct(string productId, ulong userId)
+        public async Task<UnregisterReturnState> UnRegisterProduct(string productId, ulong userId)
         {
-            if(!_RegisteredProducts.ContainsKey(productId))
+            try
             {
-                return UnregisterReturnState.NotRegistered;
-            }
+                Product product = _AmdDbService.GetProductById(productId);
+                if (product == null)
+                {
+                    return UnregisterReturnState.NotRegistered;
+                }
 
-            int userIndex = _RegisteredProducts[productId].Users.FindIndex(x => x.Equals(userId));
-            if(userIndex == -1)
+                User user = product.Users.FirstOrDefault(x => x.UserId == userId);
+                if (user == null)
+                {
+                    return UnregisterReturnState.NotRegistered;
+                }
+
+                bool success = _AmdDbService.RemoveUser(product, user);
+                if (!success)
+                {
+                    return UnregisterReturnState.InternalError;
+                }
+
+                if (product.Users.Count == 0)
+                {
+                    _AmdDbService.RemoveProduct(product);
+                }
+
+                if (_AmdDbService.GetAllRegisteredProducts().Count == 0)
+                {
+                    _UrlCheckCancelToken.Cancel();
+                }
+
+                return UnregisterReturnState.Ok;
+            }
+            catch(Exception e)
             {
-                return UnregisterReturnState.NotRegistered;
+                _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Error, _Source, e.Message, e));
             }
-
-            _RegisteredProducts[productId].Users.RemoveAt(userIndex);
-            if(_RegisteredProducts[productId].Users.Count == 0)
-            {
-                _RegisteredProducts.Remove(productId);
-            }
-
-            if(_RegisteredProducts.Count == 0)
-            {
-                _UrlCheckCancelToken.Cancel();
-            }
-
-            return UnregisterReturnState.Ok;
+            return UnregisterReturnState.InternalError;
         }
 
         public async Task Run(CancellationToken token)
@@ -177,7 +211,6 @@ namespace AmdStockCheck.Service
                 }
 
             }
-
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Background Task stopped!"));
         }
 
@@ -202,9 +235,11 @@ namespace AmdStockCheck.Service
         private List<Task<HttpResponseMessage>> SendAllRequests(HttpClient client)
         {
             List<Task<HttpResponseMessage>> responses = new List<Task<HttpResponseMessage>>();
-            foreach (var products in _RegisteredProducts)
+            List<Product> products = _AmdDbService.GetAllRegisteredProducts();
+
+            foreach (var product in products)
             {
-                responses.Add(client.GetAsync(products.Value.CheckUrl));
+                responses.Add(client.GetAsync(product.CheckUrl));
             }
             return responses;
         }
@@ -229,20 +264,20 @@ namespace AmdStockCheck.Service
 
         private async Task CheckResponse(HttpResponseMessage response)
         {
-            var product = _RegisteredProducts.FirstOrDefault(x => x.Value.CheckUrl == response.RequestMessage.RequestUri.ToString());
-            if (response.IsSuccessStatusCode && product.Value != null)
+            Product product = _AmdDbService.GetProductByCheckUrl(response.RequestMessage.RequestUri.ToString());
+            if (response.IsSuccessStatusCode && product != null)
             {
                 if (await CheckAvailableAsync(response))
                 {
-                    OnSuccess(product.Value);
+                    OnSuccess(product);
                 }
                 else if(await CheckInQueueAsync(response))
                 {
-                    OnInQueue(product.Value);
+                    OnInQueue(product);
                 }
                 else
                 {
-                    _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Debug, _Source, $"{product.Value.Alias}: Not Available!"));
+                    _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Debug, _Source, $"{product.Alias}: Not Available!"));
                 }
             }
             else
@@ -262,7 +297,7 @@ namespace AmdStockCheck.Service
             return (await response.Content.ReadAsStringAsync()).Contains(_InQueueString);
         }
 
-        private void OnSuccess(ProductEntry product)
+        private void OnSuccess(Product product)
         {
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Success!"));
 
@@ -274,7 +309,7 @@ namespace AmdStockCheck.Service
             }
         }
 
-        private void OnInQueue(ProductEntry product)
+        private void OnInQueue(Product product)
         {
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Success!"));
 
@@ -292,9 +327,10 @@ namespace AmdStockCheck.Service
 
             string message = $"Something's Not Quite Right...\n{_ErrorUrl}";
             HashSet<ulong> allUniqueUsers = new HashSet<ulong>();
-            foreach(var item in _RegisteredProducts)
+            List<Product> products = _AmdDbService.GetAllRegisteredProducts();
+            foreach(var item in products)
             {
-                foreach(var user in item.Value.Users)
+                foreach(var user in item.Users)
                 {
                     allUniqueUsers.Add(user.UserId);
                 }

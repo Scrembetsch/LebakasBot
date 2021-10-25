@@ -1,8 +1,9 @@
 ﻿using BackgroundMessageDispatcher;
 using Discord;
 using Discord.Commands;
+using Discord.Rest;
 using Discord.WebSocket;
-using Interfaces.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Configuration;
@@ -21,7 +22,7 @@ namespace LebakasBot
         public async Task MainAsync()
         {
             TokenManager tokenManager = new TokenManager();
-            DiscordSocketConfig config = new DiscordSocketConfig()
+            DiscordSocketConfig socketConfig = new DiscordSocketConfig()
             {
                 MessageCacheSize = int.Parse(ConfigurationManager.AppSettings["MessageCacheSize"]),
                 TotalShards = int.Parse(ConfigurationManager.AppSettings["TotalShards"]),
@@ -31,31 +32,47 @@ namespace LebakasBot
                 LogLevel = LogSeverity.Error
 #endif
             };
+            DiscordRestConfig restConfig = new DiscordRestConfig()
+            {
+#if DEBUG
+                LogLevel = LogSeverity.Info
+#else
+                LogLevel = LogSeverity.Error
+#endif
+            };
 
-            using (ServiceProvider services = ConfigureServices(config))
+            using (ServiceProvider services = ConfigureServices(socketConfig, restConfig))
             {
                 DiscordShardedClient shardClient = services.GetRequiredService<DiscordShardedClient>();
+                DiscordRestClient restClient = services.GetRequiredService<DiscordRestClient>();
 
                 shardClient.ShardReady += ReadyAsync;
                 shardClient.Log += Logger.LogAsync;
+
+                restClient.Log += Logger.LogAsync;
 
                 await services.GetRequiredService<CommandHandlingService>().InitializeAsync();
 
                 await shardClient.LoginAsync(TokenType.Bot, tokenManager.Token);
                 await shardClient.StartAsync();
 
+                await restClient.LoginAsync(TokenType.Bot, tokenManager.Token);
+
                 await Task.Delay(Timeout.Infinite);
             }
         }
 
-        private ServiceProvider ConfigureServices(DiscordSocketConfig config)
+        private ServiceProvider ConfigureServices(DiscordSocketConfig socketConfig, DiscordRestConfig restConfig)
         {
             ServiceProvider services = new ServiceCollection()
-                .AddSingleton(new DiscordShardedClient(config))
+                .AddSingleton(new DiscordShardedClient(socketConfig))
+                .AddSingleton(new DiscordRestClient(restConfig))
                 .AddSingleton<CommandService>()
                 .AddSingleton<CommandHandlingService>()
                 .AddSingleton<MessageDispatcher>()
                 .AddSingleton(AmdStockCheck.Util.Web.CreateClient())
+                .AddDbContext<AmdStockCheck.DataAccess.AmdStockCheckContext>()
+                .AddSingleton<AmdStockCheck.DataAccess.AmdDatabaseService>()
                 .AddSingleton<AmdStockCheck.Service.AmdStockCheckService>()
                 .BuildServiceProvider();
 

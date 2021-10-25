@@ -10,19 +10,12 @@ using System.Threading.Tasks;
 namespace AmdStockCheck.Models
 {
     [Table("Users")]
-    public sealed class RegisteredUser : IEquatable<RegisteredUser>, IEquatable<ulong>
+    public sealed class User
     {
         [Key]
+        public ulong Id { get; set; }
+        [ForeignKey("Id")]
+        public ulong ProductId { get; set; }
         public ulong UserId { get; set; }
-
-        public bool Equals(RegisteredUser user)
-        {
-            return UserId == user.UserId;
-        }
-
-        public bool Equals(ulong userId)
-        {
-            return UserId == userId;
-        }
     }
 }

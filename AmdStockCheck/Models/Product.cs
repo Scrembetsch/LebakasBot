@@ -9,12 +9,13 @@ using System.Threading.Tasks;
 namespace AmdStockCheck.Models
 {
     [Table("Products")]
-    public class ProductEntry
+    public class Product
     {
         [Key]
+        public ulong Id { get; set; }
         public string ProductId { get; set; }
         public string Alias { get; set; }
         public string CheckUrl  { get; set; }
-        public List<RegisteredUser> Users  { get; set; }
+        public List<User> Users  { get; set; }
     }
 }
