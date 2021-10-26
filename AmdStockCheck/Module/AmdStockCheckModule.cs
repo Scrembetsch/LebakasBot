@@ -28,28 +28,7 @@ namespace AmdStockCheck.Module
             _ = Task.Run(async () =>
             {
                 AmdStockCheckService.RegisterReturnState ret = await CheckService.RegisterProductAsync(productId, Context.Message.Author.Id);
-                switch (ret)
-                {
-                    case AmdStockCheckService.RegisterReturnState.CannotMessage:
-                        await ReplyAsync(Data.PredefinedStrings.cAdd_CannotMessage);
-                        break;
-
-                    case AmdStockCheckService.RegisterReturnState.UrlCheckFailed:
-                        await ReplyAsync(Data.PredefinedStrings.cAdd_UrlCheckFailed);
-                        break;
-
-                    case AmdStockCheckService.RegisterReturnState.AlreadyRegistered:
-                        await ReplyAsync(Data.PredefinedStrings.cAdd_AlreadyRegisterd);
-                        break;
-
-                    case AmdStockCheckService.RegisterReturnState.Ok:
-                        await ReplyAsync(Data.PredefinedStrings.cAdd_Ok);
-                        break;
-
-                    case AmdStockCheckService.RegisterReturnState.InternalError:
-                        await ReplyAsync(Data.PredefinedStrings.cGeneral_InternalError);
-                        break;
-                }
+                await ReplyAsync(Data.PredefinedStrings.GetString(ret));
             });
             return Task.CompletedTask;
         }
@@ -61,20 +40,7 @@ namespace AmdStockCheck.Module
             _ = Task.Run(async () =>
             {
                 AmdStockCheckService.UnregisterReturnState ret = CheckService.UnRegisterProduct(productId, Context.Message.Author.Id);
-                switch (ret)
-                {
-                    case AmdStockCheckService.UnregisterReturnState.NotRegistered:
-                        await ReplyAsync(Data.PredefinedStrings.cRemove_NotRegistered);
-                        break;
-
-                    case AmdStockCheckService.UnregisterReturnState.Ok:
-                        await ReplyAsync(Data.PredefinedStrings.cRemove_Ok);
-                        break;
-
-                    case AmdStockCheckService.UnregisterReturnState.InternalError:
-                        await ReplyAsync(Data.PredefinedStrings.cGeneral_InternalError);
-                        break;
-                }
+                await ReplyAsync(Data.PredefinedStrings.GetString(ret));
             });
             return Task.CompletedTask;
         }
