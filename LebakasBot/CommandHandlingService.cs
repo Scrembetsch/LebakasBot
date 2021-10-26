@@ -3,6 +3,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Configuration;
 using System.Threading.Tasks;
 
 namespace LebakasBot
@@ -12,6 +13,7 @@ namespace LebakasBot
         private readonly CommandService _CommandService;
         private readonly DiscordShardedClient _ShardedClient;
         private readonly IServiceProvider _Services;
+        private readonly char _BotPrefix;
 
         public CommandHandlingService(IServiceProvider services)
         {
@@ -22,6 +24,8 @@ namespace LebakasBot
             _CommandService.CommandExecuted += CommandExecutedAsync;
             _CommandService.Log += Logger.LogAsync;
             _ShardedClient.MessageReceived += MessageReceivedAsync;
+
+            _BotPrefix = ConfigurationManager.AppSettings["BotPrefix"][0];
         }
 
         public async Task InitializeAsync()
@@ -37,9 +41,13 @@ namespace LebakasBot
             }
 
             int argPos = 0;
-            if(!message.HasMentionPrefix(_ShardedClient.CurrentUser, ref argPos))
+            if(message.Channel is not IDMChannel)
             {
-                return;
+                if (!message.HasCharPrefix(_BotPrefix, ref argPos)
+                    && !message.HasMentionPrefix(_ShardedClient.CurrentUser, ref argPos))
+                {
+                    return;
+                }
             }
 
             ShardedCommandContext context = new ShardedCommandContext(_ShardedClient, message);
