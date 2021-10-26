@@ -2,10 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
-using System.Configuration;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace AmdStockCheck.DataAccess
 {
@@ -13,6 +9,8 @@ namespace AmdStockCheck.DataAccess
     {
         public DbSet<Product> Products { get; set; }
         public DbSet<User> Users { get; set; }
+
+        private readonly string _DbLocation = DbMigration.LatestDbLocation + DbMigration.DbName;
 
         public AmdStockCheckContext() : base()
         {
@@ -29,12 +27,14 @@ namespace AmdStockCheck.DataAccess
             if(!optionsBuilder.IsConfigured)
             {
                 base.OnConfiguring(optionsBuilder);
-                optionsBuilder.UseSqlite(ConfigurationManager.AppSettings["AmdDbLocation"]);
+                optionsBuilder.UseSqlite("DataSource=" + _DbLocation);
             }
         }
 
         private void OnCreate()
         {
+            DbMigration.Migrate();
+
             //Database.EnsureDeleted();
             Database.EnsureCreated();
         }
