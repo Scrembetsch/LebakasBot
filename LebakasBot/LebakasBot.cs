@@ -21,25 +21,25 @@ namespace LebakasBot
 
         public async Task MainAsync()
         {
+            LogSeverity logLevel =
+#if DEBUG
+                LogSeverity.Info;
+#else
+                LogSeverity.Error;
+#endif
+
             TokenManager tokenManager = new TokenManager();
             DiscordSocketConfig socketConfig = new DiscordSocketConfig()
             {
                 MessageCacheSize = int.Parse(ConfigurationManager.AppSettings["MessageCacheSize"]),
                 TotalShards = int.Parse(ConfigurationManager.AppSettings["TotalShards"]),
-#if DEBUG
-                LogLevel = LogSeverity.Info
-#else
-                LogLevel = LogSeverity.Error
-#endif
+                LogLevel = logLevel
             };
             DiscordRestConfig restConfig = new DiscordRestConfig()
             {
-#if DEBUG
-                LogLevel = LogSeverity.Info
-#else
-                LogLevel = LogSeverity.Error
-#endif
+                LogLevel = logLevel
             };
+            Logger.LogLevel = logLevel;
 
             using (ServiceProvider services = ConfigureServices(socketConfig, restConfig))
             {
@@ -62,7 +62,7 @@ namespace LebakasBot
             }
         }
 
-        private ServiceProvider ConfigureServices(DiscordSocketConfig socketConfig, DiscordRestConfig restConfig)
+        private static ServiceProvider ConfigureServices(DiscordSocketConfig socketConfig, DiscordRestConfig restConfig)
         {
             ServiceProvider services = new ServiceCollection()
                 .AddSingleton(new DiscordShardedClient(socketConfig))

@@ -46,7 +46,7 @@ namespace LebakasBot
             await _CommandService.ExecuteAsync(context, argPos, _Services);
         }
 
-        public async Task CommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
+        public static async Task CommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
         {
             if(!command.IsSpecified
                 || result.IsSuccess)
