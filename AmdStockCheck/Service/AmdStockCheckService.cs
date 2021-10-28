@@ -33,12 +33,13 @@ namespace AmdStockCheck.Service
             InternalError
         }
 
-        private float _CheckInterval;
         private string _BaseCheckUrl;
         private string _BaseOpenUrl;
         private string _ErrorUrl;
         private string _ContainString;
         private string _InQueueString;
+        private float _CheckInterval;
+        private int _ErrorCounter;
 
         private Task _UrlCheckTask = null;
         private CancellationTokenSource _UrlCheckCancelToken;
@@ -49,6 +50,7 @@ namespace AmdStockCheck.Service
         private readonly MessageDispatcher _MessageDispatcher;
         private readonly AmdDatabaseService _AmdDbService;
 
+        private const int cErrorCounterTarget = 2;
         public AmdStockCheckService(IServiceProvider services)
         {
             _Client = services.GetService<Web.StockCheckClient>();
@@ -187,11 +189,18 @@ namespace AmdStockCheck.Service
             await Task.Delay(100, token);
 
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Background Task started!"));
-
+            int runCounter = 0;
             while (!token.IsCancellationRequested)
             {
                 try
                 {
+                    runCounter++;
+                    if(runCounter >= 2)
+                    {
+                        _ErrorCounter = 0;
+                        runCounter = 0;
+                    }
+
                     DateTime begin = DateTime.Now;
                     // Send all requests to get product info
                     var responseTasks = SendAllRequests(_Client);
@@ -328,22 +337,28 @@ namespace AmdStockCheck.Service
 
         private void OnError()
         {
-            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"Runner error!"));
-
-            string message = Data.PredefinedStrings.cService_RequestError.ReplaceId(0,_ErrorUrl);
-
-            HashSet<ulong> allUniqueUsers = new HashSet<ulong>();
-            List<Product> products = _AmdDbService.GetAllRegisteredProducts();
-            foreach(var item in products)
+            _ErrorCounter++;
+            if(_ErrorCounter >= cErrorCounterTarget)
             {
-                foreach(var user in item.Users)
+                _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"Runner error!"));
+
+                string message = Data.PredefinedStrings.cService_RequestError.ReplaceId(0, _ErrorUrl);
+
+                HashSet<ulong> allUniqueUsers = new HashSet<ulong>();
+                List<Product> products = _AmdDbService.GetAllRegisteredProducts();
+                foreach (var item in products)
                 {
-                    allUniqueUsers.Add(user.UserId);
+                    foreach (var user in item.Users)
+                    {
+                        allUniqueUsers.Add(user.UserId);
+                    }
                 }
-            }
-            foreach(var userId in allUniqueUsers)
-            {
-                _ = _MessageDispatcher.SendPrivateMessageAsync(message, userId);
+                foreach (var userId in allUniqueUsers)
+                {
+                    _ = _MessageDispatcher.SendPrivateMessageAsync(message, userId);
+                }
+
+                _ErrorCounter = 0;
             }
         }
     }
