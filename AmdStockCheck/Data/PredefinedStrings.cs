@@ -42,7 +42,7 @@ namespace AmdStockCheck.Data
             return (state switch
             {
                 AmdStockCheckService.UnregisterReturnState.NotRegistered => cRemove_NotRegistered,
-                AmdStockCheckService.UnregisterReturnState.Ok => cAdd_Ok,
+                AmdStockCheckService.UnregisterReturnState.Ok => cRemove_Ok,
                 _ => cGeneral_InternalError
             });
         }
