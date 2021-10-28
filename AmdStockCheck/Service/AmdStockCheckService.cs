@@ -277,6 +277,10 @@ namespace AmdStockCheck.Service
             {
                 for (int i = 0; i < responseTasks.Count; i++)
                 {
+                    if(responseTasks[i].IsCanceled)
+                    {
+                        responseTasks.RemoveAt(i--);
+                    }
                     if (responseTasks[i].IsCompleted)
                     {
                         _ = CheckResponse(responseTasks[i].Result);
