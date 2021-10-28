@@ -207,7 +207,10 @@ namespace AmdStockCheck.Service
                 catch(Exception e)
                 {
                     _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Error, _Source, $"Error while running background task: {e}"));
-                    OnError();
+                    if(e is not TaskCanceledException)
+                    {
+                        OnError();
+                    }
                 }
 
             }
