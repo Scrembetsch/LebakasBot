@@ -297,25 +297,30 @@ namespace AmdStockCheck.Service
         private async Task CheckResponse(HttpResponseMessage response)
         {
             Product product = _AmdDbService.GetProductByCheckUrl(response.RequestMessage.RequestUri.ToString());
-            if (response.IsSuccessStatusCode && product != null)
+            if (response.IsSuccessStatusCode)
             {
-                if (await CheckAvailableAsync(response))
+                if(product == null)
                 {
-                    OnSuccess(product);
-                }
-                else if(await CheckInQueueAsync(response))
-                {
-                    OnInQueue(product);
+                    if (await CheckInQueueAsync(response))
+                    {
+                        OnInQueue(product);
+                    }
+                    else
+                    {
+                        OnError();
+                    }
                 }
                 else
                 {
-                    _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Debug, _Source, $"{product.Alias}: Not Available!"));
+                    if (await CheckAvailableAsync(response))
+                    {
+                        OnSuccess(product);
+                    }
+                    else
+                    {
+                        _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Debug, _Source, $"{product.Alias}: Not Available!"));
+                    }
                 }
-            }
-            else
-            {
-                // Error usually occurs when page enters queue mode -> Products will become available in a few minutes
-                OnError();
             }
         }
 
