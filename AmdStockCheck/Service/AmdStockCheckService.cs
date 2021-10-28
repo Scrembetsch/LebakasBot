@@ -17,6 +17,7 @@ namespace AmdStockCheck.Service
 {
     public class AmdStockCheckService
     {
+        #region Enums
         public enum RegisterReturnState
         {
             Ok,
@@ -32,14 +33,21 @@ namespace AmdStockCheck.Service
             NotRegistered,
             InternalError
         }
+        #endregion
 
+        #region Fields
+        // Configuration Values
         private string _BaseCheckUrl;
         private string _BaseOpenUrl;
         private string _ErrorUrl;
         private string _ContainString;
         private string _InQueueString;
         private float _CheckInterval;
+        private int _ErrorReportThreshold;
+        private int _NumSuccessErrorReset;
+
         private int _ErrorCounter;
+        private int _RunCounter;
 
         private Task _UrlCheckTask = null;
         private CancellationTokenSource _UrlCheckCancelToken;
@@ -49,13 +57,17 @@ namespace AmdStockCheck.Service
         private readonly Web.StockCheckClient _Client;
         private readonly MessageDispatcher _MessageDispatcher;
         private readonly AmdDatabaseService _AmdDbService;
+        #endregion
 
-        private const int cErrorCounterTarget = 2;
+        #region Init
         public AmdStockCheckService(IServiceProvider services)
         {
             _Client = services.GetService<Web.StockCheckClient>();
             _MessageDispatcher = services.GetService<MessageDispatcher>();
             _AmdDbService = services.GetService<AmdDatabaseService>();
+
+            _ErrorCounter = 0;
+            _RunCounter = 0;
 
             ApplyConfig();
 
@@ -76,8 +88,12 @@ namespace AmdStockCheck.Service
             _ContainString = ConfigurationManager.AppSettings["AmdCheckString"];
             _InQueueString = ConfigurationManager.AppSettings["AmdInQueueCheckString"];
             _CheckInterval = float.Parse(ConfigurationManager.AppSettings["AmdCheckInterval"]);
+            _ErrorReportThreshold = int.Parse(ConfigurationManager.AppSettings["AmdErrorThreshold"]);
+            _NumSuccessErrorReset = int.Parse(ConfigurationManager.AppSettings["AmdErrorValueResetAfterNumRuns"]);
         }
+        #endregion
 
+        #region Module Interaction
         public async Task<RegisterReturnState> RegisterProductAsync(string productId, ulong userId)
         {
             try
@@ -182,24 +198,20 @@ namespace AmdStockCheck.Service
             }
             return UnregisterReturnState.InternalError;
         }
+        #endregion
 
+        #region Runner
         public async Task Run(CancellationToken token)
         {
             // just here to get this method running on background task
             await Task.Delay(100, token);
 
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Background Task started!"));
-            int runCounter = 0;
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    runCounter++;
-                    if(runCounter >= 2)
-                    {
-                        _ErrorCounter = 0;
-                        runCounter = 0;
-                    }
+                    UpdateErrorCounter();
 
                     DateTime begin = DateTime.Now;
                     // Send all requests to get product info
@@ -225,7 +237,9 @@ namespace AmdStockCheck.Service
             }
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, "Background Task stopped!"));
         }
+        #endregion
 
+        #region Requests
         private async Task<string> ValidateUrlAsync(string url)
         {
             // log and send that something is happening
@@ -308,7 +322,9 @@ namespace AmdStockCheck.Service
         {
             return (await response.Content.ReadAsStringAsync()).Contains(_InQueueString);
         }
+        #endregion
 
+        #region Messages
         private void OnSuccess(Product product)
         {
             _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Success!"));
@@ -338,7 +354,7 @@ namespace AmdStockCheck.Service
         private void OnError()
         {
             _ErrorCounter++;
-            if(_ErrorCounter >= cErrorCounterTarget)
+            if(_ErrorCounter >= _ErrorReportThreshold)
             {
                 _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"Runner error!"));
 
@@ -361,5 +377,21 @@ namespace AmdStockCheck.Service
                 _ErrorCounter = 0;
             }
         }
+        #endregion
+
+        #region Helper
+        private void UpdateErrorCounter()
+        {
+            if (_ErrorCounter > 0)
+            {
+                _RunCounter++;
+                if (_RunCounter >= _NumSuccessErrorReset)
+                {
+                    _ErrorCounter = 0;
+                    _RunCounter = 0;
+                }
+            }
+        }
+        #endregion
     }
 }
