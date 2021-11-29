@@ -21,7 +21,7 @@ namespace AmdStockCheck.Data
         public const string cGeneral_InternalError  = "Product already registered for this User! ། – _ – །";
 
         public const string cService_Available      = "Available: {0}\n{1}";
-        public const string cService_QueueStarted   = "Queue started: {0}\n{1}";
+        public const string cService_QueueStarted   = "Queue started:\n{0}";
         public const string cService_RequestError   = "Something's not quite right...\n{0}";
         #endregion
 

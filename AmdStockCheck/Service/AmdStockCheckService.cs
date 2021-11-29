@@ -303,7 +303,7 @@ namespace AmdStockCheck.Service
                 {
                     if (await CheckInQueueAsync(response))
                     {
-                        OnInQueue(product);
+                        OnInQueue();
                     }
                     else
                     {
@@ -331,6 +331,8 @@ namespace AmdStockCheck.Service
 
         public async Task<bool> CheckInQueueAsync(HttpResponseMessage response)
         {
+            string t = await response.Content.ReadAsStringAsync();
+
             return (await response.Content.ReadAsStringAsync()).Contains(_InQueueString);
         }
         #endregion
@@ -349,16 +351,24 @@ namespace AmdStockCheck.Service
             }
         }
 
-        private void OnInQueue(Product product)
+        private void OnInQueue()
         {
-            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"{product.Alias}: Success!"));
+            _ = Logger.LogAsync(new Discord.LogMessage(Discord.LogSeverity.Info, _Source, $"Queue running!"));
 
-            string openUrl = _BaseOpenUrl.Replace("{ProductId}", product.ProductId);
-            string message = Data.PredefinedStrings.cService_QueueStarted.ReplaceId(0, product.Alias).ReplaceId(1, openUrl);
+            string message = Data.PredefinedStrings.cService_QueueStarted.ReplaceId(0, _ErrorUrl);
 
-            foreach (var user in product.Users)
+            HashSet<ulong> allUniqueUsers = new HashSet<ulong>();
+            List<Product> products = _AmdDbService.GetAllRegisteredProducts();
+            foreach (var item in products)
             {
-                _ = _MessageDispatcher.SendPrivateMessageAsync(message, user.UserId);
+                foreach (var user in item.Users)
+                {
+                    allUniqueUsers.Add(user.UserId);
+                }
+            }
+            foreach (var userId in allUniqueUsers)
+            {
+                _ = _MessageDispatcher.SendPrivateMessageAsync(message, userId);
             }
         }
 
