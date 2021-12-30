@@ -21,12 +21,7 @@ namespace LebakasBot
 
         public async Task MainAsync()
         {
-            LogSeverity logLevel =
-#if DEBUG
-                LogSeverity.Info;
-#else
-                LogSeverity.Error;
-#endif
+            LogSeverity logLevel = (LogSeverity)Enum.Parse(typeof(LogSeverity), ConfigurationManager.AppSettings["LogSeverity"]);
 
             TokenManager tokenManager = new TokenManager();
             DiscordSocketConfig socketConfig = new DiscordSocketConfig()

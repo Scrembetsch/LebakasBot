@@ -301,14 +301,15 @@ namespace AmdStockCheck.Service
             {
                 if(product == null)
                 {
-                    if (await CheckInQueueAsync(response))
-                    {
-                        OnInQueue();
-                    }
-                    else
-                    {
-                        OnError();
-                    }
+                    OnError();
+
+                    //if (await CheckInQueueAsync(response))
+                    //{
+                    //    OnInQueue();
+                    //}
+                    //else
+                    //{
+                    //}
                 }
                 else
                 {
